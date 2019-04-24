@@ -1,74 +1,45 @@
 const topology = require('fully-connected-topology')
 const {
-    stdin,
-    exit,
-    argv
-} = process
-const {
-    log
-} = console
-const {
-    me,
-    peers
-} = extractPeersAndMyPort()
-const sockets = {}
-log('---------------------')
-log('Welcome to p2p chat!')
-log('me - ', me)
-log('peers - ', peers)
-log('connecting to peers...')
-const myIp = toLocalIp(me)
-const peerIps = getPeerIps(peers)
-topology(myIp, peerIps).on('connection', (socket, peerIp) => {
-    const peerPort = extractPortFromIp(peerIp)
-    log('connected to peer - ', peerPort)
-    sockets[peerPort] = socket
-    stdin.on('data', data => { //on user input
-        const message = data.toString().trim()
-        if (message === 'exit') { //on exit
-            log('Bye bye')
-            exit(0)
-        }
-        const receiverPeer = extractReceiverPeer(message)
-        if (sockets[receiverPeer]) { //message to specific peer
-            if (peerPort === receiverPeer) { //write only once
-                sockets[receiverPeer].write(formatMessage(extractMessageToSpecificPeer(message)))
-            }
-        } else { //broadcast message to everyone
-            socket.write(formatMessage(message))
-        }
-    })
-    //print data when received
-    socket.on('data', data => log(data.toString('utf8')))
-})
-//extract ports from process arguments, {me: first_port, peers: rest... }
-function extractPeersAndMyPort() {
-    return {
-        me: argv[2],
-        peers: argv.slice(3, argv.length)
-    }
-}
-//'4000' -> '127.0.0.1:4000'
-function toLocalIp(port) {
-    return '127.0.0.1:' + port
-}
-//['4000', '4001'] -> ['127.0.0.1:4000', '127.0.0.1:4001']
-function getPeerIps(peers) {
-    return peers.map(peer => toLocalIp(peer))
-}
-//'hello' -> 'myPort:hello'
-function formatMessage(message) {
-    return me + '>' + message
-}
-//'127.0.0.1:4000' -> '4000'
-function extractPortFromIp(peer) {
-    return peer.toString().slice(peer.length - 4, peer.length);
-}
-//'4000>hello' -> '4000'
-function extractReceiverPeer(message) {
-    return message.slice(0, 4);
-}
-//'4000>hello' -> 'hello'
-function extractMessageToSpecificPeer(message) {
-    return message.slice(5, message.length);
-}
+    Blockchain,
+    Block,
+    Transaction
+} = require('./Blockchain.3.js')
+const { Wallet } = require('./wallet.js')
+
+
+let HelloKitty = new Blockchain();
+var wallet1 = new Wallet("e0c6cf98de0d4f478725784075f78d3d673d32f66a923ff775feb0a2276cdfb6");
+var wallet2 = new Wallet("4ad69131757e95267f0f01bd9b138fde7b78ac3f929225253c51c035d882fda8");
+
+var t1 = topology('127.0.0.1:4001', ['127.0.0.1:4002', '127.0.0.1:4003']);
+var t2 = topology('127.0.0.1:4002', ['127.0.0.1:4001', '127.0.0.1:4003']);
+var t3 = topology('127.0.0.1:4003', ['127.0.0.1:4001', '127.0.0.1:4002']);
+
+t1.on('connection', function(connection, peer) {
+  HelloKitty.minePendingTransactions('reward-address');
+  console.log('\nBalance of Bob is', HelloKitty.getBalanceOfAddress('reward-address'));
+});
+
+t2.on('connection', function(connection, peer) {
+  var transaction1 = new Transaction(wallet1.getPublicKey(), wallet2.getPublicKey(), 200);
+  transaction1.signTransaction(wallet1.key);
+  HelloKitty.addTransaction(transaction1);
+
+  var transaction2 = new Transaction(wallet1.getPublicKey(), wallet2.getPublicKey(), 100);
+  transaction2.signTransaction(wallet1.key);
+  HelloKitty.addTransaction(transaction2);
+  console.log('\nBalance of address1 is', HelloKitty.getBalanceOfAddress(wallet1.getPublicKey()));
+
+});
+
+t3.on('connection', function(connection, peer) {
+  var transaction3 = new Transaction(wallet2.getPublicKey(), wallet1.getPublicKey(), 10);
+  transaction3.signTransaction(wallet2.key);
+  HelloKitty.addTransaction(transaction3);
+
+  var transaction4 = new Transaction(wallet2.getPublicKey(), wallet1.getPublicKey(), 20);
+  transaction4.signTransaction(wallet2.key);
+  HelloKitty.addTransaction(transaction4);
+  console.log('\nBalance of address2 is', HelloKitty.getBalanceOfAddress(wallet2.getPublicKey()));
+
+});
