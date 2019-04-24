@@ -1,5 +1,7 @@
 const SHA256 = require("crypto-js/sha256");
 const { MerkleTree } = require('merkletreejs');
+const { BloomFilter } = require('bloomfilter');
+
 
 class Transaction {
     constructor(fromAddress, toAddress, amount) {
@@ -10,20 +12,25 @@ class Transaction {
 }
 
 class Block {
-    constructor(timestamp, transactions, previousHash = '', merkletree, bloomfilter) {
-        //this.index = index;
+    constructor(timestamp, transactions, previousHash = '') {
         this.previousHash = previousHash;
-        this.timestamp = timestamp;
-        //this.data = data;
+        this.timestamp = timestamp
         this.transactions = transactions;
+        this.merkletree = new MerkleTree(transactions.map(x => SHA256(x)), SHA256);
+        this.bloomfilter = this.createBloomFilter();
         this.hash = this.calculateHash();
         this.nonce = 0;
-        this.merkletree = merkletree;
-        this.bloomfilter = bloomfilter;
+    }
+
+    createBloomFilter() {
+      var bf = new BloomFilter(1024, 1);
+      for (var trans in this.transactions) {
+        bf.add(trans);
+      }
     }
 
     calculateHash() {
-        return SHA256(this.previousHash + this.timestamp + JSON.stringify(this.transactions) + this.nonce).toString();
+        return SHA256(this.previousHash + this.timestamp + this.merkletree.getRoot() + this.nonce).toString();
 
     }
 
@@ -35,9 +42,6 @@ class Block {
 
         console.log("BLOCK MINED: " + this.hash + " " + this.nonce);
     }
-
-
-
 }
 
 
@@ -50,19 +54,18 @@ class Blockchain {
         this.miningReward = 100;
     }
     createGenesis() {
-        return new Block("01/01/2018", "genesis block", "0");
+        return new Block("01/01/2018", [], "0");
 
     }
 
     minePendingTransactions(miningRewardAdress) {
         const rewardTx = new Transaction(null, miningRewardAdress, this.miningReward);
         this.pendingTransactions.push(rewardTx);
-        var merkletree = new MerkleTree(this.pendingTransactions, SHA256)
-        let block = new Block(Date.now(), merkletree.getRoot(), this.getLatestBlock().hash);
+        let block = new Block(Date.now(), this.pendingTransactions.slice(0, 5), this.getLatestBlock().hash);
         block.mineBlock(this.difficulty);
         console.log('Block successfully mined!');
         this.chain.push(block);
-        this.pendingTransactions = [];
+        this.pendingTransactions = this.pendingTransactions.slice(4);
     }
 
     createTransaction(transaction) {
