@@ -1,0 +1,20 @@
+{
+  "name": "code",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "dependencies": {
+    "bloomfilter": "0.0.18",
+    "crypto-js": "^3.1.9-1",
+    "elliptic": "^6.4.1",
+    "fully-connected-topology": "^1.1.1",
+    "merkletreejs": "^0.0.25"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
