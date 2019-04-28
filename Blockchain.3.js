@@ -81,24 +81,29 @@ class Block {
    */
    constructor(timestamp, transactions, previousHash = '') {
        this.previousHash = previousHash;
-       this.timestamp = timestamp
+       this.timestamp = timestamp;
        this.transactions = transactions;
-       this.merkletree = new MerkleTree(transactions.map(x => SHA256(x)), SHA256);
+       this.merkletree = this.createMerkleTree();
        this.bloomfilter = this.createBloomFilter();
        this.hash = this.calculateHash();
        this.nonce = 0;
    }
 
-   /**
+
+  createMerkleTree() {
+    return new MerkleTree(this.transactions.map(x => SHA256(x.signature)), SHA256);
+  }
+
+  /**
    *
    *
    *
    **/
        createBloomFilter() {
          var bf = new BloomFilter(1024, 1);
-         for (var trans in this.transactions) {
-           bf.add(trans);
-           console.log(bf.test(trans));
+         var leaves = this.transactions.map(x => x.signature);
+         for (var i = 0; i < leaves.length; i++) {
+           bf.add(leaves[i]);
          }
          return bf;
        }
@@ -161,15 +166,21 @@ class Blockchain {
   }
 
   initChain() {
-    return [this.createGenesisBlock()];
-    var that = this;
-    fs.readFile('chain.json', function(err, data) {
-      if (err || typeof data === 'undefined'){
-        return [that.createGenesisBlock()];
-      }else {
-        return JSON.parse(data);
-      }
-      });
+    let chain = false;
+    try{
+      chain = JSON.parse(fs.readFileSync('chain.json', 'utf8'));
+    } catch (e) {
+    }
+    if (!chain) {
+      console.log("GENESIS")
+      return [this.createGenesisBlock()];
+    }
+    for (let i = 0; i < chain.length; i++) {
+      var block = chain[i];
+      var newBlock = new Block(block.timestamp, block.transactions, block.previousHash);
+      chain[i] = newBlock;
+    }
+    return chain;
     }
 
   dumpChain() {
@@ -318,10 +329,8 @@ class Blockchain {
   }
 
   findPossibleBlocks(transaction){
-    return this.chain.filter(x => x.bloomfilter.test(transaction));
+    return this.chain.filter(x => x.bloomfilter.test(transaction.signature));
   }
-
-
 }
 
 module.exports.Blockchain = Blockchain;
