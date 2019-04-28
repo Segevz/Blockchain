@@ -3,6 +3,8 @@ const EC = require('elliptic').ec;
 const ec = new EC('secp256k1');
 const { MerkleTree } = require('merkletreejs');
 const { BloomFilter } = require('bloomfilter');
+const fs = require("fs");
+
 
 class Transaction {
   /**
@@ -96,7 +98,9 @@ class Block {
          var bf = new BloomFilter(1024, 1);
          for (var trans in this.transactions) {
            bf.add(trans);
+           console.log(bf.test(trans));
          }
+         return bf;
        }
 
   /**
@@ -143,7 +147,7 @@ class Block {
 
 class Blockchain {
   constructor() {
-    this.chain = [this.createGenesisBlock()];
+    this.chain = this.initChain();
     this.difficulty = 2;
     this.pendingTransactions = [];
     this.miningReward = 100;
@@ -155,6 +159,26 @@ class Blockchain {
   createGenesisBlock() {
     return new Block(Date.parse('2017-01-01'), [], '0');
   }
+
+  initChain() {
+    return [this.createGenesisBlock()];
+    var that = this;
+    fs.readFile('chain.json', function(err, data) {
+      if (err || typeof data === 'undefined'){
+        return [that.createGenesisBlock()];
+      }else {
+        return JSON.parse(data);
+      }
+      });
+    }
+
+  dumpChain() {
+    fs.writeFile('chain.json', JSON.stringify(this.chain), function (err) {
+      if (err) throw err;
+      console.log('dumped chain to "chain.json"');
+    });
+  }
+
 
   /**
    * Returns the latest block on our chain. Useful when you want to create a
@@ -174,6 +198,9 @@ class Blockchain {
    * @param {string} miningRewardAddress
    */
   minePendingTransactions(miningRewardAddress) {
+    if (this.pendingTransactions.length == 0){
+      return false;
+    }
     const rewardTx = new Transaction(null, miningRewardAddress, this.miningReward);
     this.pendingTransactions.push(rewardTx);
 
@@ -184,6 +211,7 @@ class Blockchain {
     this.chain.push(block);
 
     this.pendingTransactions = this.pendingTransactions.slice(4);
+    return true;
   }
 
   /**
@@ -252,9 +280,9 @@ class Blockchain {
   }
 
   /**
-   * Loops over all the blocks in the chain and verify if they are properly
+   * Loops over all the possibleBlocks in the chain and verify if they are properly
    * linked together and nobody has tampered with the hashes. By checking
-   * the blocks it also verifies the (signed) transactions inside of them.
+   * the possibleBlocks it also verifies the (signed) transactions inside of them.
    *
    * @returns {boolean}
    */
@@ -267,7 +295,7 @@ class Blockchain {
       return false;
     }
 
-    // Check the remaining blocks on the chain to see if there hashes and
+    // Check the remaining possibleBlocks on the chain to see if there hashes and
     // signatures are correct
     for (let i = 1; i < this.chain.length; i++) {
       const currentBlock = this.chain[i];
@@ -288,6 +316,12 @@ class Blockchain {
 
     return true;
   }
+
+  findPossibleBlocks(transaction){
+    return this.chain.filter(x => x.bloomfilter.test(transaction));
+  }
+
+
 }
 
 module.exports.Blockchain = Blockchain;
